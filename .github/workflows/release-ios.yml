@@ -8,12 +8,10 @@ on:
 
 jobs:
   build-ios:
-    name: Build Unsigned IPA
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,39 +25,36 @@ jobs:
         working-directory: ios
         run: pod install --repo-update
 
-      - name: Detect Xcode Scheme
-        id: scheme
-        run: |
-          SCHEME=$(ls ios | grep ".xcworkspace" | sed 's/.xcworkspace//')
-          echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
+      - run: mkdir -p build
 
-      - name: Build Xcode archive
+      - name: Build Xcode archive (Fixed)
         run: |
           xcodebuild \
-            -workspace ios/${{ steps.scheme.outputs.scheme }}.xcworkspace \
-            -scheme ${{ steps.scheme.outputs.scheme }} \
+            -workspace ios/Nuvio.xcworkspace \
+            -scheme Nuvio \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath build/App.xcarchive \
+            -archivePath $PWD/build/App.xcarchive \
             archive | xcpretty
+
+      - name: Verify archive
+        run: ls -lah $PWD/build
 
       - name: Export unsigned IPA
         run: |
           xcodebuild \
             -exportArchive \
-            -archivePath build/App.xcarchive \
+            -archivePath $PWD/build/App.xcarchive \
             -exportOptionsPlist ios/exportOptions.plist \
-            -exportPath build \
+            -exportPath $PWD/build \
             | xcpretty
 
-      - name: Upload IPA artifact (v4)
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: Unsigned-IPA
           path: build/*.ipa
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           files: build/*.ipa
           draft: true
