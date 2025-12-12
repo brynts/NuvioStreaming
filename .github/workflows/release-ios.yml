@@ -11,8 +11,12 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      # -------------------------
+      # Node & JS Dependencies
+      # -------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -21,13 +25,19 @@ jobs:
       - name: Install JS dependencies
         run: npm install --legacy-peer-deps
 
+      # -------------------------
+      # iOS dependencies (Pods)
+      # -------------------------
       - name: Install CocoaPods
         working-directory: ios
         run: pod install --repo-update
 
       - run: mkdir -p build
 
-      - name: Build Xcode archive (Fixed)
+      # -------------------------
+      # Xcode Archive
+      # -------------------------
+      - name: Build Xcode archive (Unsigned)
         run: |
           xcodebuild \
             -workspace ios/Nuvio.xcworkspace \
@@ -35,11 +45,17 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -archivePath $PWD/build/App.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             archive | xcpretty
 
       - name: Verify archive
-        run: ls -lah $PWD/build
+        run: ls -lah build
 
+      # -------------------------
+      # Export Unsigned IPA
+      # -------------------------
       - name: Export unsigned IPA
         run: |
           xcodebuild \
@@ -47,14 +63,25 @@ jobs:
             -archivePath $PWD/build/App.xcarchive \
             -exportOptionsPlist ios/exportOptions.plist \
             -exportPath $PWD/build \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             | xcpretty
 
-      - uses: actions/upload-artifact@v4
+      # -------------------------
+      # Upload via GitHub Actions artifact
+      # -------------------------
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
         with:
           name: Unsigned-IPA
           path: build/*.ipa
 
-      - uses: softprops/action-gh-release@v2
+      # -------------------------
+      # GitHub Release
+      # -------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           files: build/*.ipa
           draft: true
